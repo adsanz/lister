@@ -62,7 +62,7 @@ if args['filter_key'] and args['filter_value'] != None:
 else:
     filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
 
-ec2_dict = []
+ec2_list = []
 
 ec2 = session.resource('ec2')
 for instance in ec2.instances.filter(
@@ -74,9 +74,9 @@ for instance in ec2.instances.filter(
     for tags in instance.tags:
         if tags["Key"] == "Name":
             name = tags["Value"]
-    ec2_dict.append([instance.instance_id,name, pub_ip])
+    ec2_list.append([instance.instance_id,name, pub_ip])
     
 print(
-    tabulate(ec2_dict, 
+    tabulate(ec2_list, 
     headers=['Instance ID','Name','Public IP'])
 )
