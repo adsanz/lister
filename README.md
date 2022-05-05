@@ -6,4 +6,9 @@ The script will retrieve the public IP, name and instance ID.
 
 You will require a profile with access to ec2 listing.
 
+Requires:
+- boto3
+- tabulate
+- profiles with access to ec2 read capabilities
+
 By AdSanz @ MrMilú
