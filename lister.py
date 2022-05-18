@@ -61,17 +61,22 @@ def main():
     for instance in ec2.instances.filter(
             Filters=filter):
         pub_ip = instance.public_ip_address
+        # No need to check if priv IP are empty, since AWS will always assign a private IP to instances
+        priv_ip_list = []
+        for priv_ip in instance.network_interfaces_attribute:
+            priv_ip_list.append(priv_ip['PrivateIpAddress'])
         name = "None"
         if pub_ip == None:
             pub_ip = "None"
         for tags in instance.tags:
             if tags["Key"] == "Name":
                 name = tags["Value"]
-        ec2_list.append([instance.instance_id,name, pub_ip])
+
+        ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list)])
         
     print(
         tabulate(ec2_list, 
-        headers=['Instance ID','Name','Public IP'])
+        headers=['Instance ID','Name','Public IP', 'Private IP'])
     )
 
 if args['list'] != None:
