@@ -68,9 +68,12 @@ def main():
         name = "None"
         if pub_ip == None:
             pub_ip = "None"
-        for tags in instance.tags:
-            if tags["Key"] == "Name":
-                name = tags["Value"]
+        if instance.tags == None:
+            tags = "None"
+        else:
+            for tags in instance.tags:
+                if tags["Key"] == "Name":
+                    name = tags["Value"]
 
         ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list)])
         
