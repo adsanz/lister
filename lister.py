@@ -4,6 +4,7 @@ import boto3
 import argparse
 from argparse import RawTextHelpFormatter
 from tabulate import tabulate
+import datetime
 
 parser = argparse.ArgumentParser(description="""
 This script will list your ec2 instance with a given profile.
@@ -60,6 +61,7 @@ def main():
     ec2 = session.resource('ec2')
     for instance in ec2.instances.filter(
             Filters=filter):
+        uptime = (datetime.datetime.now().astimezone() - instance.launch_time).days
         pub_ip = instance.public_ip_address
         # No need to check if priv IP are empty, since AWS will always assign a private IP to instances
         priv_ip_list = []
@@ -75,11 +77,11 @@ def main():
                 if tags["Key"] == "Name":
                     name = tags["Value"]
 
-        ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list)])
+        ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list), str(uptime)+" Days"])
         
     print(
         tabulate(ec2_list, 
-        headers=['Instance ID','Name','Public IP', 'Private IP'])
+        headers=['Instance ID','Name','Public IP', 'Private IP', 'Uptime (days)'])
     )
 
 if args['list'] != None:
