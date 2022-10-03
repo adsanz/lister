@@ -21,6 +21,11 @@ You may also define a region (if not configured on the profile this is required)
 - Get all instances on region us-west-1 with profile leo, with tag env set to prodp3, and role set to webserver
   lister.py -p leo -r us-west-1 -fk tag:env tag:role -fv prodp3 webservers
 
+- Complex filtering patterns!
+  lister.py -p leo -r us-west-2 -fk tag:env tag:role -fv staging,beta webservers
+
+
+
 Aditionally, you can list how many instances per region you have in case you don't know which region you are searching for
 after this, you can filter adding the region you found instances for
 
@@ -58,7 +63,10 @@ def main():
         filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
         # allow multiple sets of filter keys and values
         for fk,fv in zip(args['filter_key'],args['filter_value']):
-            filter_list = [{'Name': fk, 'Values': [fv]}]
+            if "," in fv:
+                filter_list= [{'Name': fk, 'Values': fv.split(',')}]
+            else:
+                filter_list = [{'Name': fk, 'Values': [fv]}]
             filter += filter_list
     else:
         filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
