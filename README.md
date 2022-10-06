@@ -50,4 +50,11 @@ optional arguments:
 
 ```
 
-By AdSanz @ MrMilú
+
+## Output
+
+**Added on V1**
+
+I'm using [Rich](https://github.com/Textualize/rich) to format tables and output so it's easier on the human eye :) 
+
+By AdSanz

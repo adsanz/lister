@@ -3,8 +3,10 @@
 import boto3
 import argparse
 from argparse import RawTextHelpFormatter
-from tabulate import tabulate
 import datetime
+from rich.console import Console
+from rich.table import Table
+
 
 parser = argparse.ArgumentParser(description="""
 This script will list your ec2 instance with a given profile.
@@ -40,6 +42,9 @@ parser.add_argument('-fv','--filter_value', help='Value used for filtering (one 
 parser.add_argument('-l','--list', help='Ammount of instances per region (one or more)', required=False, default=None, action='store_true')
 args = vars(parser.parse_args())
 
+console = Console()
+
+
 def lister():
     if args['list'] != None:
         regions = ['us-west-1', 'us-west-2', 'us-east-1', 'us-east-2', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-central-1', 'eu-north-1', 'ap-south-1', 'ap-southeast-1', 'ap-northeast-1', 'ap-northeast-2',
@@ -48,10 +53,13 @@ def lister():
             instances = 0
             session = boto3.session.Session(profile_name=args['profile'], region_name=region)
             ec2 = session.resource('ec2')
-            for instance in ec2.instances.all():
-                instances = instances+1
-            if instances != 0:
-                print("Found {} instances on region {}".format(instances,region))
+            with console.status("[bold green]Getting instances...", spinner="dots") as status:
+                for instance in ec2.instances.all():
+                    instances = instances+1
+                if instances != 0:
+                    console.log("Found [bold underline white on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold green" )
+                else:
+                    console.log("Found [bold underline red on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold red" )
 
 def main():
     if args['region'] != None:
@@ -72,32 +80,35 @@ def main():
         filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
 
     ec2_list = []
-
+    
     ec2 = session.resource('ec2')
-    for instance in ec2.instances.filter(
-            Filters=filter):
-        uptime = (datetime.datetime.now().astimezone() - instance.launch_time).days
-        pub_ip = instance.public_ip_address
-        # No need to check if priv IP are empty, since AWS will always assign a private IP to instances
-        priv_ip_list = []
-        for priv_ip in instance.network_interfaces_attribute:
-            priv_ip_list.append(priv_ip['PrivateIpAddress'])
-        name = "None"
-        if pub_ip == None:
-            pub_ip = "None"
-        if instance.tags == None:
-            tags = "None"
-        else:
-            for tags in instance.tags:
-                if tags["Key"] == "Name":
-                    name = tags["Value"]
+    with console.status("[bold green]Listing instances...", spinner="dots") as status:
+        for instance in ec2.instances.filter(
+                Filters=filter):
+            uptime = (datetime.datetime.now().astimezone() - instance.launch_time).days
+            pub_ip = instance.public_ip_address
+            # No need to check if priv IP are empty, since AWS will always assign a private IP to instances
+            priv_ip_list = []
+            for priv_ip in instance.network_interfaces_attribute:
+                priv_ip_list.append(priv_ip['PrivateIpAddress'])
+            name = "None"
+            if pub_ip == None:
+                pub_ip = "None"
+            if instance.tags == None:
+                tags = "None"
+            else:
+                for tags in instance.tags:
+                    if tags["Key"] == "Name":
+                        name = tags["Value"]
 
-        ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list), str(uptime)+" Days"])
-        
-    print(
-        tabulate(ec2_list, 
-        headers=['Instance ID','Name','Public IP', 'Private IP', 'Uptime (days)'])
-    )
+            ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list), str(uptime)+" Days"])
+        ec2_table = Table(title="EC2 Instances")
+        for header in ['Instance ID','Name','Public IP', 'Private IP', 'Uptime (days)']:
+            ec2_table.add_column(header, justify="center", style="cyan", no_wrap=True)
+        for row in ec2_list:
+            ec2_table.add_row(*row)
+
+    console.print(ec2_table)
 
 if args['list'] != None:
     lister()
