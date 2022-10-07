@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from typing import Union
 
 import boto3
 import argparse
@@ -6,6 +7,29 @@ from argparse import RawTextHelpFormatter
 import datetime
 from rich.console import Console
 from rich.table import Table
+
+
+REGIONS = (
+    'us-west-1',
+    'us-west-2',
+    'us-east-1',
+    'us-east-2',
+    'eu-west-1',
+    'eu-west-2',
+    'eu-west-3',
+    'eu-central-1',
+    'eu-north-1',
+    'ap-south-1',
+    'ap-southeast-1',
+    'ap-northeast-1',
+    'ap-northeast-2',
+    'ap-northeast-3',
+    'ap-southeast-1',
+    'ap-southeast-2',
+    'sa-east-1',
+    'ca-central-1',
+)
+console = Console()
 
 
 parser = argparse.ArgumentParser(description="""
@@ -26,40 +50,43 @@ You may also define a region (if not configured on the profile this is required)
 - Complex filtering patterns!
   lister.py -p leo -r us-west-2 -fk tag:env tag:role -fv staging,beta webservers
 
-
-
-Aditionally, you can list how many instances per region you have in case you don't know which region you are searching for
+Additionally, you can list how many instances per region you have in case you don't know which region you are searching for
 after this, you can filter adding the region you found instances for
 
 - Find out how many instances per region you have
   lister.py -p leo -l
 
-""",formatter_class=RawTextHelpFormatter)
+""", formatter_class=RawTextHelpFormatter)
 parser.add_argument('-r','--region', help='Region to be used for ec2 listing', required=False, default=None)
 parser.add_argument('-p','--profile', help='Profile to authenticate', required=True)
 parser.add_argument('-fk','--filter_key', help='Key used for filtering', required=False, default=None, nargs='*')
 parser.add_argument('-fv','--filter_value', help='Value used for filtering (one or more)', required=False, default=None, nargs='*')
-parser.add_argument('-l','--list', help='Ammount of instances per region (one or more)', required=False, default=None, action='store_true')
+parser.add_argument('-l','--list', help='Amount of instances per region (one or more)', required=False, default=None, action='store_true')
 args = vars(parser.parse_args())
-
-console = Console()
 
 
 def lister():
-    if args['list'] != None:
-        regions = ['us-west-1', 'us-west-2', 'us-east-1', 'us-east-2', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-central-1', 'eu-north-1', 'ap-south-1', 'ap-southeast-1', 'ap-northeast-1', 'ap-northeast-2',
-        'ap-northeast-3', 'ap-southeast-1', 'ap-southeast-2', 'sa-east-1', 'ca-central-1']
-        for region in regions:
-            instances = 0
-            session = boto3.session.Session(profile_name=args['profile'], region_name=region)
-            ec2 = session.resource('ec2')
-            with console.status("[bold green]Getting instances...", spinner="dots") as status:
-                for instance in ec2.instances.all():
-                    instances = instances+1
-                if instances != 0:
-                    console.log("Found [bold underline white on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold green" )
-                else:
-                    console.log("Found [bold underline red on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold red" )
+    if args.get("list") is None:
+        return
+
+    for region in REGIONS:
+        session = boto3.session.Session(profile_name=args['profile'], region_name=region)
+        ec2 = session.resource('ec2')
+
+        with console.status(f"[bold green]Getting instances for {region}...", spinner="dots"):
+            instances = list(ec2.instances.all())
+
+            underline_color = "red"
+            style = "bold red"
+            if instances:
+                underline_color = "white"
+                style = "bold green"
+
+            msg = (
+                f"Found [bold underline {underline_color} on black]{len(instances)}[/] instances "
+                f"on region [bold underline white on black]{region}[/]"
+            )
+            console.log(msg, style=style)
 
 def main():
     if args['region'] != None:
