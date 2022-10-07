@@ -89,39 +89,43 @@ def lister():
             console.log(msg, style=style)
 
 def main():
-    if args['region'] != None:
-        session = boto3.session.Session(profile_name=args['profile'], region_name=args['region'])
-    else:
-        session = boto3.session.Session(profile_name=args['profile'])
+    kwargs = {
+        "profile_name": args.get("profile"),
+    }
+    if args.get("region"):
+        kwargs["region_name"] = args.get("region")
 
-    if args['filter_key'] and args['filter_value'] != None:
-        filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
-        # allow multiple sets of filter keys and values
-        for fk,fv in zip(args['filter_key'],args['filter_value']):
+    session = boto3.session.Session(**kwargs)
+
+    filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
+    if args['filter_key'] and args['filter_value'] is not None:
+        # Allow multiple sets of filter keys and values
+        for fk, fv in zip(args['filter_key'],args['filter_value']):
             if "," in fv:
-                filter_list= [{'Name': fk, 'Values': fv.split(',')}]
+                filter_list = [{'Name': fk, 'Values': fv.split(',')}]
             else:
                 filter_list = [{'Name': fk, 'Values': [fv]}]
             filter += filter_list
-    else:
-        filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
 
     ec2_list = []
     
     ec2 = session.resource('ec2')
-    with console.status("[bold green]Listing instances...", spinner="dots") as status:
+    with console.status("[bold green]Listing instances...", spinner="dots"):
         for instance in ec2.instances.filter(
                 Filters=filter):
             uptime = (datetime.datetime.now().astimezone() - instance.launch_time).days
             pub_ip = instance.public_ip_address
-            # No need to check if priv IP are empty, since AWS will always assign a private IP to instances
+
+            # No need to check if private IPs are empty, since AWS will always assign a private IP to instances
             priv_ip_list = []
             for priv_ip in instance.network_interfaces_attribute:
                 priv_ip_list.append(priv_ip['PrivateIpAddress'])
             name = "None"
-            if pub_ip == None:
+
+            if pub_ip is None:
                 pub_ip = "None"
-            if instance.tags == None:
+
+            if instance.tags is None:
                 tags = "None"
             else:
                 for tags in instance.tags:
@@ -129,15 +133,20 @@ def main():
                         name = tags["Value"]
 
             ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list), str(uptime)+" Days"])
+
         ec2_table = Table(title="EC2 Instances")
-        for header in ['Instance ID','Name','Public IP', 'Private IP', 'Uptime (days)']:
+
+        for header in ['Instance ID', 'Name', 'Public IP', 'Private IP', 'Uptime (days)']:
             ec2_table.add_column(header, justify="center", style="cyan", no_wrap=True)
+
         for row in ec2_list:
             ec2_table.add_row(*row)
 
     console.print(ec2_table)
 
-if args['list'] != None:
-    lister()
-else:
-    main()
+
+if __name__ == "__main__":
+    if args.get("list"):
+        lister()
+    else:
+        main()
