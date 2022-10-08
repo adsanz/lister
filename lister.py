@@ -66,26 +66,36 @@ parser.add_argument('-l','--list', help='Amount of instances per region (one or 
 args = vars(parser.parse_args())
 
 console = Console()
-if args['region'] != None:
-    session = boto3.session.Session(profile_name=args['profile'], region_name=args['region'])
-else:
-    session = boto3.session.Session(profile_name=args['profile'])
-ec2 = session.resource('ec2')
 
 
-def lister(ec2):
-    if args.get("list") is None:
-        return
+def lister() -> None:
+    """
+    List how many instances we have for each region.
 
+    Args:
+        None.
+    Return:
+        Nothing.
+    """
     for region in REGIONS:
-        instances = 0
-        with console.status("[bold green]Getting instances...", spinner="dots") as status:
-            for instance in ec2.instances.all():
-                instances = instances+1
-            if instances != 0:
-                console.log("Found [bold underline white on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold green" )
-            else:
-                console.log("Found [bold underline red on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold red" )
+        session = boto3.session.Session(profile_name=args.get("profile"), region_name=region)
+
+        with console.status(f"[bold green]Getting instances for[/] {region} ...", spinner="dots"):
+            ec2 = session.resource('ec2')
+            instances = list(ec2.instances.all())
+
+            color = "white"
+            style = "bold green"
+            if not instances:
+                color = "red"
+                style = "bold red"
+
+            msg = (
+                f"Found [bold underline {color} on black]{len(instances)}[/] instances on" 
+                f" region [bold underline white on black]{region}[/]"
+            )
+            console.log(msg, style=style)
+
 
 def instance(ec2):
     with console.status("[bold green]Getting instances...", spinner="dots"):
@@ -109,7 +119,13 @@ def instance(ec2):
         table.add_row("Instance Tags", JSON(json.dumps(instance.tags)))
     console.print(table)
 
-def main(ec2):
+
+def main():
+    if args['region'] != None:
+        session = boto3.session.Session(profile_name=args['profile'], region_name=args['region'])
+    else:
+        session = boto3.session.Session(profile_name=args['profile'])
+
     if args['filter_key'] and args['filter_value'] != None:
         filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
         # allow multiple sets of filter keys and values
@@ -162,6 +178,6 @@ def main(ec2):
 
 if __name__ == "__main__":
     if args.get("list"):
-        lister(ec2)
+        lister()
     else:
-        main(ec2)
+        main()
