@@ -68,6 +68,12 @@ args = vars(parser.parse_args())
 console = Console()
 
 
+def get_ec2(profile: str, region: str):
+    session = boto3.session.Session(profile_name=profile, region_name=region)
+
+    return session.resource("ec2")
+
+
 def lister() -> None:
     """
     List how many instances we have for each region.
@@ -78,10 +84,8 @@ def lister() -> None:
         Nothing.
     """
     for region in REGIONS:
-        session = boto3.session.Session(profile_name=args.get("profile"), region_name=region)
-
         with console.status(f"[bold green]Getting instances for[/] {region} ...", spinner="dots"):
-            ec2 = session.resource('ec2')
+            ec2 = get_ec2(profile=args.get("profile"), region=region)
             instances = list(ec2.instances.all())
 
             color = "white"
@@ -120,7 +124,7 @@ def instance(ec2):
     console.print(table)
 
 
-def main():
+def main(ec2):
     if args['region'] != None:
         session = boto3.session.Session(profile_name=args['profile'], region_name=args['region'])
     else:
@@ -177,7 +181,18 @@ def main():
 
 
 if __name__ == "__main__":
+    profile_name = args.get("profile")
+    region_name = args.get("region")
+
+    ec2 = None
+    if region_name:
+        ec2 = get_ec2(profile=profile_name, region=region_name)
+
     if args.get("list"):
         lister()
+
+    elif args.get("instance_id"):
+        instance(ec2)
+
     else:
-        main()
+        main(ec2)
