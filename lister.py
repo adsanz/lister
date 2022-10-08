@@ -1,14 +1,35 @@
 #!/usr/bin/python3
-from typing import Union
+
+import json
+import datetime
+import argparse
 
 import boto3
-import argparse
-from argparse import RawTextHelpFormatter
-import datetime
-import json
 from rich.json import JSON
 from rich.console import Console
 from rich.table import Table
+
+
+REGIONS = (
+    'us-west-1',
+    'us-west-2',
+    'us-east-1',
+    'us-east-2',
+    'eu-west-1',
+    'eu-west-2',
+    'eu-west-3',
+    'eu-central-1',
+    'eu-north-1',
+    'ap-south-1',
+    'ap-southeast-1',
+    'ap-northeast-1',
+    'ap-northeast-2',
+    'ap-northeast-3',
+    'ap-southeast-1',
+    'ap-southeast-2',
+    'sa-east-1',
+    'ca-central-1',
+)
 
 
 parser = argparse.ArgumentParser(description="""
@@ -35,12 +56,12 @@ You may also define a region (if not configured on the profile this is required)
 - Find out how many instances per region you have
   lister.py -p leo -l
 
-""", formatter_class=RawTextHelpFormatter)
+""", formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-r','--region', help='Region to be used for ec2 listing', required=False, default=None)
 parser.add_argument('-p','--profile', help='Profile to authenticate', required=True)
 parser.add_argument('-fk','--filter_key', help='Key used for filtering', required=False, default=None, nargs='*')
 parser.add_argument('-fv','--filter_value', help='Value used for filtering (one or more)', required=False, default=None, nargs='*')
-parser.add_argument('-i','--instance-id', help='Get instance details nicely formated', required=False, default=None)
+parser.add_argument('-i','--instance-id', help='Get instance details nicely formatted', required=False, default=None)
 parser.add_argument('-l','--list', help='Amount of instances per region (one or more)', required=False, default=None, action='store_true')
 args = vars(parser.parse_args())
 
@@ -51,19 +72,20 @@ else:
     session = boto3.session.Session(profile_name=args['profile'])
 ec2 = session.resource('ec2')
 
+
 def lister(ec2):
-    if args['list'] != None:
-        regions = ['us-west-1', 'us-west-2', 'us-east-1', 'us-east-2', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-central-1', 'eu-north-1', 'ap-south-1', 'ap-southeast-1', 'ap-northeast-1', 'ap-northeast-2',
-        'ap-northeast-3', 'ap-southeast-1', 'ap-southeast-2', 'sa-east-1', 'ca-central-1']
-        for region in regions:
-            instances = 0
-            with console.status("[bold green]Getting instances...", spinner="dots") as status:
-                for instance in ec2.instances.all():
-                    instances = instances+1
-                if instances != 0:
-                    console.log("Found [bold underline white on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold green" )
-                else:
-                    console.log("Found [bold underline red on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold red" )
+    if args.get("list") is None:
+        return
+
+    for region in REGIONS:
+        instances = 0
+        with console.status("[bold green]Getting instances...", spinner="dots") as status:
+            for instance in ec2.instances.all():
+                instances = instances+1
+            if instances != 0:
+                console.log("Found [bold underline white on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold green" )
+            else:
+                console.log("Found [bold underline red on black]{}[/] instances on region [bold underline white on black]{}[/]".format(instances,region), style="bold red" )
 
 def instance(ec2):
     with console.status("[bold green]Getting instances...", spinner="dots"):
