@@ -10,8 +10,7 @@ You will require a profile with access to ec2 listing.
 Help command: 
 
 ```
-usage: lister.py [-h] [-r REGION] -p PROFILE [-fk [FILTER_KEY [FILTER_KEY ...]]]
-                 [-fv [FILTER_VALUE [FILTER_VALUE ...]]] [-l]
+usage: lister.py [-h] [-r REGION] -p PROFILE [-fk [FILTER_KEY [FILTER_KEY ...]]] [-fv [FILTER_VALUE [FILTER_VALUE ...]]] [-l] [-i INSTANCE_ID]
 
 This script will list your ec2 instance with a given profile.
 You may also define a region (if not configured on the profile this is required), and you can filter. A few examples:
@@ -30,8 +29,8 @@ You may also define a region (if not configured on the profile this is required)
 - Complex filtering patterns!
   lister.py -p leo -r us-west-2 -fk tag:env tag:role -fv staging,beta webservers
 
-Aditionally, you can list how many instances per region you have in case you don't know which region you are searching for
-after this, you can filter adding the region you found instances for
+-  Get details from an instance
+  lister.py -p leo -i i-1234567890abcdef0
 
 - Find out how many instances per region you have
   lister.py -p leo -l
@@ -47,7 +46,8 @@ optional arguments:
   -fv [FILTER_VALUE [FILTER_VALUE ...]], --filter_value [FILTER_VALUE [FILTER_VALUE ...]]
                         Value used for filtering (one or more)
   -l, --list            Ammount of instances per region (one or more)
-
+  -i INSTANCE_ID, --instance-id INSTANCE_ID
+                        Get instance details nicely formated
 ```
 
 
