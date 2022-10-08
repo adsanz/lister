@@ -101,9 +101,9 @@ def lister() -> None:
             console.log(msg, style=style)
 
 
-def instance(ec2):
+def show_instance(ec2):
     with console.status("[bold green]Getting instances...", spinner="dots"):
-        instance = ec2.Instance(args['instance_details'])
+        instance = ec2.Instance(args.get("instance_id"))
         table = Table(show_header=True, header_style="bold magenta", show_lines=True)
         table.add_column("Attribute", style="white bold dim", width=20)
         table.add_column("Value", style="white dim")
@@ -116,7 +116,7 @@ def instance(ec2):
         table.add_row("Instance Public DNS", instance.public_dns_name)
         table.add_row("Instance Private DNS", instance.private_dns_name)
         table.add_row("Instance Key Name", instance.key_name)
-        table.add_row("Instance IAM Role", instance.iam_instance_profile)
+        table.add_row("Instance IAM Role", JSON(json.dumps(instance.iam_instance_profile)))
         table.add_row("Instance VPC ID", instance.vpc_id)
         table.add_row("Instance Subnet ID", instance.subnet_id)
         table.add_row("Instance Security Groups", JSON(json.dumps(instance.security_groups)))
@@ -192,7 +192,7 @@ if __name__ == "__main__":
         lister()
 
     elif args.get("instance_id"):
-        instance(ec2)
+        show_instance(ec2)
 
     else:
         main(ec2)
