@@ -99,6 +99,9 @@ def get_ec2(profile: str, region: str = None):
     """
     try:
         if region:
+            if region not in REGIONS:
+                console.log(f":warning: Region {region} is not valid. Exiting...", style="bold red")
+                exit(1)
             session = boto3.Session(profile_name=profile, region_name=region)
         else:
             random_region = choice(REGIONS)
