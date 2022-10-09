@@ -17,27 +17,6 @@ if NICE_TRACEBACK:
     install(show_locals=True)   
 
 
-REGIONS = (
-    'us-west-1',
-    'us-west-2',
-    'us-east-1',
-    'us-east-2',
-    'eu-west-1',
-    'eu-west-2',
-    'eu-west-3',
-    'eu-central-1',
-    'eu-north-1',
-    'ap-south-1',
-    'ap-southeast-1',
-    'ap-northeast-1',
-    'ap-northeast-2',
-    'ap-northeast-3',
-    'ap-southeast-1',
-    'ap-southeast-2',
-    'sa-east-1',
-    'ca-central-1',
-)
-
 parser = argparse.ArgumentParser(description="""
 This script will list your ec2 instance with a given profile.
 You may also define a region (if not configured on the profile this is required), and you can filter. A few examples:
@@ -81,13 +60,29 @@ def handler(signum, frame):
     Handles ctrl-c on show_instances() for a clean exit.
     
     """
+
     console.log(":warning: Ctrl-C detected. Exiting lister..." , style="bold yellow")
     exit(2)
 
 signal.signal(signal.SIGINT, handler)
 
 
-def get_ec2(profile: str, region: str = None):
+def region_lister(profile: str) -> list:
+    """
+    List all regions from AWS instead of hardcoding them.
+
+    Args:
+        profile: AWS profile to be used.
+    Return:
+        List of regions.
+    """
+    session = boto3.Session(profile_name=profile, region_name="us-east-1")
+    client = session.client("ec2")
+    REGIONS = [region['RegionName'] for region in client.describe_regions()['Regions']]
+    return REGIONS
+
+
+def get_ec2(profile: str, region: str = None, REGIONS: list = None) -> object:
     """
     Return a boto3 ec2 session object.
 
@@ -97,23 +92,20 @@ def get_ec2(profile: str, region: str = None):
     Return:
         boto3 ec2 session object.
     """
-    try:
-        if region:
-            if region not in REGIONS:
-                console.log(f":warning: Region {region} is not valid. Exiting...", style="bold red")
-                exit(1)
-            session = boto3.Session(profile_name=profile, region_name=region)
-        else:
-            random_region = choice(REGIONS)
-            session = boto3.Session(profile_name=profile, region_name=random_region)
-            console.log(f":warning: No region defined. Using [bold underline white on black]{random_region}[/] as profile region.", style="bold yellow")
-    except:
-        console.log(f":warning: Profile [bold underline white on black]{profile}[/] not found. Exiting...", style="bold red")
-        exit(1)
+    if region:
+        if region not in REGIONS:
+            console.log(f":warning: Region {region} is not valid. Exiting...", style="bold red")
+            exit(1)
+        session = boto3.Session(profile_name=profile, region_name=region)
+    else:
+        random_region = choice(REGIONS)
+        session = boto3.Session(profile_name=profile, region_name=random_region)
+        console.log(f":warning: No region defined. Using [bold underline white on black]{random_region}[/] as profile region.", style="bold yellow")
+
     return session.resource("ec2")
 
 
-def lister() -> None:
+def lister(REGIONS: list = None) -> None:
     """
     List how many instances we have for each region.
 
@@ -225,11 +217,16 @@ def main(ec2) -> None:
 if __name__ == "__main__":
     profile_name = args.get("profile")
     region_name = args.get("region")
-
-    ec2 = get_ec2(profile=profile_name, region=region_name)
+    
+    try:
+        REGIONS = region_lister(profile=profile_name)
+    except:
+        console.log(f":warning: Profile {profile_name} is not valid. Exiting...", style="bold red")
+        exit(1)
+    ec2 = get_ec2(profile=profile_name, region=region_name, REGIONS=REGIONS)
 
     if args.get("list"):
-        lister()
+        lister(REGIONS=REGIONS)
 
     elif args.get("instance_id"):
         show_instance(ec2, args.get("instance_id"))
