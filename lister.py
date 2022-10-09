@@ -1,13 +1,21 @@
 #!/usr/bin/python3
 
+from secrets import choice
 import json
 import datetime
 import argparse
-
+import botocore
 import boto3
 from rich.json import JSON
 from rich.console import Console
 from rich.table import Table
+# Trap ctrl-c for show_instance clearner exit
+import signal
+# Automatic rich traceback handler
+NICE_TRACEBACK = False
+if NICE_TRACEBACK:
+    from rich.traceback import install
+    install(show_locals=True)   
 
 
 REGIONS = (
@@ -30,7 +38,6 @@ REGIONS = (
     'sa-east-1',
     'ca-central-1',
 )
-
 
 parser = argparse.ArgumentParser(description="""
 This script will list your ec2 instance with a given profile.
@@ -56,6 +63,8 @@ You may also define a region (if not configured on the profile this is required)
 - Find out how many instances per region you have
   lister.py -p leo -l
 
+WARNING: if no region is defined, a random one will be used.
+
 """, formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-r','--region', help='Region to be used for ec2 listing', required=False, default=None)
 parser.add_argument('-p','--profile', help='Profile to authenticate', required=True)
@@ -65,11 +74,36 @@ parser.add_argument('-i','--instance-id', help='Get instance details nicely form
 parser.add_argument('-l','--list', help='Amount of instances per region (one or more)', required=False, default=None, action='store_true')
 args = vars(parser.parse_args())
 
-console = Console()
+console = Console( )
 
 
-def get_ec2(profile: str, region: str):
-    session = boto3.session.Session(profile_name=profile, region_name=region)
+def handler(signum, frame):
+    """
+    Handles ctrl-c on show_instances() for a clean exit.
+    
+    """
+    console.log(":warning: Ctrl-C detected. Exiting lister..." , style="bold yellow")
+    exit(2)
+
+signal.signal(signal.SIGINT, handler)
+
+
+def get_ec2(profile: str, region: str = None):
+    """
+    Return a boto3 ec2 session object.
+
+    Args:
+        profile: AWS profile to be used.
+        region: AWS region to be used.
+    Return:
+        boto3 ec2 session object.
+    """
+    if region:
+        session = boto3.Session(profile_name=profile, region_name=region)
+    else:
+        random_region = choice(REGIONS)
+        console.log(f":warning: No region defined. Using [bold underline white on black]{random_region}[/] as profile region.", style="bold yellow")
+        session = boto3.Session(profile_name=profile, region_name=random_region)
 
     return session.resource("ec2")
 
@@ -101,11 +135,20 @@ def lister() -> None:
             console.log(msg, style=style)
 
 
-def show_instance(ec2):
+def show_instance(ec2, instance_id) -> None:
+    """
+    Print in a table details of a specified instance
+
+    Args:
+        ec2: boto3 ec2 session object.
+        instance_id: Instance ID to be used.
+    Return:
+        Nothing.
+    """
     with console.status("[bold green]Getting instances...", spinner="dots"):
-        instance = ec2.Instance(args.get("instance_id"))
+        instance = ec2.Instance(instance_id)
         table = Table(show_header=True, header_style="bold magenta", show_lines=True)
-        table.add_column("Attribute", style="white bold dim", width=20)
+        table.add_column("Attribute", style="white bold dim", width=30)
         table.add_column("Value", style="white dim")
         table.add_row("Instance ID", instance.id)
         table.add_row("Instance Type", instance.instance_type)
@@ -124,12 +167,7 @@ def show_instance(ec2):
     console.print(table)
 
 
-def main(ec2):
-    if args['region'] != None:
-        session = boto3.session.Session(profile_name=args['profile'], region_name=args['region'])
-    else:
-        session = boto3.session.Session(profile_name=args['profile'])
-
+def main(ec2) -> None:
     if args['filter_key'] and args['filter_value'] != None:
         filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
         # allow multiple sets of filter keys and values
@@ -144,7 +182,6 @@ def main(ec2):
 
     ec2_list = []
     
-    ec2 = session.resource('ec2')
     with console.status("[bold green]Listing instances...", spinner="dots"):
         for instance in ec2.instances.filter(
                 Filters=filter):
@@ -184,15 +221,13 @@ if __name__ == "__main__":
     profile_name = args.get("profile")
     region_name = args.get("region")
 
-    ec2 = None
-    if region_name:
-        ec2 = get_ec2(profile=profile_name, region=region_name)
+    ec2 = get_ec2(profile=profile_name, region=region_name)
 
     if args.get("list"):
         lister()
 
     elif args.get("instance_id"):
-        show_instance(ec2)
+        show_instance(ec2, args.get("instance_id"))
 
     else:
         main(ec2)

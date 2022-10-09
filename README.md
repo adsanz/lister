@@ -57,4 +57,8 @@ optional arguments:
 
 I'm using [Rich](https://github.com/Textualize/rich) to format tables and output so it's easier on the human eye :) 
 
+### Nice tracebacks
+
+Set `NICE_TRACEBACK = True` if you want nicer tracebacks, useful for debugging. It's disabled by default.
+
 By AdSanz
