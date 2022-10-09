@@ -97,13 +97,16 @@ def get_ec2(profile: str, region: str = None):
     Return:
         boto3 ec2 session object.
     """
-    if region:
-        session = boto3.Session(profile_name=profile, region_name=region)
-    else:
-        random_region = choice(REGIONS)
-        console.log(f":warning: No region defined. Using [bold underline white on black]{random_region}[/] as profile region.", style="bold yellow")
-        session = boto3.Session(profile_name=profile, region_name=random_region)
-
+    try:
+        if region:
+            session = boto3.Session(profile_name=profile, region_name=region)
+        else:
+            random_region = choice(REGIONS)
+            session = boto3.Session(profile_name=profile, region_name=random_region)
+            console.log(f":warning: No region defined. Using [bold underline white on black]{random_region}[/] as profile region.", style="bold yellow")
+    except:
+        console.log(f":warning: Profile [bold underline white on black]{profile}[/] not found. Exiting...", style="bold red")
+        exit(1)
     return session.resource("ec2")
 
 
