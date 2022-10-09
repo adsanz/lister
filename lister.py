@@ -82,7 +82,7 @@ def region_lister(profile: str) -> list:
     return REGIONS
 
 
-def get_ec2(profile: str, region: str = None, REGIONS: list) -> object:
+def get_ec2(profile: str, region: str = None, REGIONS: list = None) -> object:
     """
     Return a boto3 ec2 session object.
 
@@ -105,7 +105,7 @@ def get_ec2(profile: str, region: str = None, REGIONS: list) -> object:
     return session.resource("ec2")
 
 
-def lister(REGIONS: list) -> None:
+def lister(REGIONS: list = None) -> None:
     """
     List how many instances we have for each region.
 
