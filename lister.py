@@ -4,7 +4,6 @@ from secrets import choice
 import json
 import datetime
 import argparse
-import botocore
 import boto3
 from rich.json import JSON
 from rich.console import Console
