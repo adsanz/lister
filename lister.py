@@ -5,9 +5,10 @@ import json
 import datetime
 import argparse
 import signal  # trap Ctrl-c for show_instance cleaner exit
-from typing import Iterable, Optional
+from typing import Optional
 
 import boto3
+from botocore.exceptions import ProfileNotFound
 from rich.json import JSON
 from rich.console import Console
 from rich.table import Table
@@ -226,11 +227,11 @@ def main(ec2) -> None:
 if __name__ == "__main__":
     profile_name = args.get("profile")
     region_name = args.get("region")
-    
+
     try:
         regions = region_lister(profile=profile_name)
-    except:
-        console.log(f":warning: Profile {profile_name} is not valid. Exiting...", style=ERROR_STYLE)
+    except ProfileNotFound:
+        console.log(f":warning: Profile '{profile_name}' is not valid. Exiting...", style=ERROR_STYLE)
         exit(1)
 
     ec2 = get_ec2(profile=profile_name, regions=regions, region=region_name)
