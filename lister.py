@@ -4,17 +4,22 @@ from secrets import choice
 import json
 import datetime
 import argparse
+import signal  # trap Ctrl-c for show_instance cleaner exit
+from typing import Iterable, Optional
+
 import boto3
 from rich.json import JSON
 from rich.console import Console
 from rich.table import Table
-# Trap ctrl-c for show_instance clearner exit
-import signal
+
+
 # Automatic rich traceback handler
 NICE_TRACEBACK = False
 if NICE_TRACEBACK:
     from rich.traceback import install
-    install(show_locals=True)   
+    install(show_locals=True)
+ERROR_STYLE = "bold red"
+WARNING_STYLE = "bold yellow"
 
 
 parser = argparse.ArgumentParser(description="""
@@ -52,7 +57,7 @@ parser.add_argument('-i','--instance-id', help='Get instance details nicely form
 parser.add_argument('-l','--list', help='Amount of instances per region (one or more)', required=False, default=None, action='store_true')
 args = vars(parser.parse_args())
 
-console = Console( )
+console = Console()
 
 
 def handler(signum, frame):
@@ -78,52 +83,56 @@ def region_lister(profile: str) -> list:
     """
     session = boto3.Session(profile_name=profile, region_name="us-east-1")
     client = session.client("ec2")
-    REGIONS = [region['RegionName'] for region in client.describe_regions()['Regions']]
-    return REGIONS
+
+    return [region['RegionName'] for region in client.describe_regions()['Regions']]
 
 
-def get_ec2(profile: str, region: str = None, REGIONS: list = None) -> object:
+def get_ec2(profile: str, regions: list, region: Optional[str] = None) -> object:
     """
     Return a boto3 ec2 session object.
 
     Args:
         profile: AWS profile to be used.
+        regions: list of available regions.
         region: AWS region to be used.
     Return:
         boto3 ec2 session object.
     """
-    if region:
-        if region not in REGIONS:
-            console.log(f":warning: Region {region} is not valid. Exiting...", style="bold red")
-            exit(1)
-        session = boto3.Session(profile_name=profile, region_name=region)
-    else:
-        random_region = choice(REGIONS)
-        session = boto3.Session(profile_name=profile, region_name=random_region)
-        console.log(f":warning: No region defined. Using [bold underline white on black]{random_region}[/] as profile region.", style="bold yellow")
+    if region is None:
+        region = choice(regions)
+        console.log(
+            f":warning: No region defined. Using [bold underline white on black]{region}[/] as profile region.",
+            style=WARNING_STYLE,
+        )
+
+    if region not in regions:
+        console.log(f":warning: Region {region} is not valid. Exiting...", style=ERROR_STYLE)
+        exit(1)
+
+    session = boto3.Session(profile_name=profile, region_name=region)
 
     return session.resource("ec2")
 
 
-def lister(REGIONS: list = None) -> None:
+def lister(regions: list) -> None:
     """
     List how many instances we have for each region.
 
     Args:
-        None.
+        regions: list of available regions.
     Return:
         Nothing.
     """
-    for region in REGIONS:
+    for region in regions:
         with console.status(f"[bold green]Getting instances for[/] {region} ...", spinner="dots"):
-            ec2 = get_ec2(profile=args.get("profile"), region=region)
+            ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=region)
             instances = list(ec2.instances.all())
 
             color = "white"
             style = "bold green"
             if not instances:
                 color = "red"
-                style = "bold red"
+                style = ERROR_STYLE
 
             msg = (
                 f"Found [bold underline {color} on black]{len(instances)}[/] instances on" 
@@ -219,14 +228,15 @@ if __name__ == "__main__":
     region_name = args.get("region")
     
     try:
-        REGIONS = region_lister(profile=profile_name)
+        regions = region_lister(profile=profile_name)
     except:
-        console.log(f":warning: Profile {profile_name} is not valid. Exiting...", style="bold red")
+        console.log(f":warning: Profile {profile_name} is not valid. Exiting...", style=ERROR_STYLE)
         exit(1)
-    ec2 = get_ec2(profile=profile_name, region=region_name, REGIONS=REGIONS)
+
+    ec2 = get_ec2(profile=profile_name, regions=regions, region=region_name)
 
     if args.get("list"):
-        lister(REGIONS=REGIONS)
+        lister(regions=regions)
 
     elif args.get("instance_id"):
         show_instance(ec2, args.get("instance_id"))
