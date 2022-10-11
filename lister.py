@@ -16,66 +16,98 @@ from rich.table import Table
 
 ERROR_STYLE = "bold red"
 WARNING_STYLE = "bold yellow"
-
-
-parser = argparse.ArgumentParser(description="""
-This script will list your ec2 instance with a given profile.
-You may also define a region (if not configured on the profile this is required), and you can filter. A few examples:
-- Get all instances on the default profile region that has the tag "env" on value "beta"
-  lister.py -p leo -fk "tag:env" -fv beta
-
-- Get all instances on the default profile region
-  lister.py -p leo
-
-- Get all instances on region 'us-west-1' with profile leo and tag "env" on value "prod"
-  lister.py -p leo -r us-west-1 -fk "tag:env" -fv beta
-
-- Get all instances on region us-west-1 with profile leo, with tag env set to prodp3, and role set to webserver
-  lister.py -p leo -r us-west-1 -fk tag:env tag:role -fv prodp3 webservers
-
-- Complex filtering patterns!
-  lister.py -p leo -r us-west-2 -fk tag:env tag:role -fv staging,beta webservers
-
--  Get details from an instance
-  lister.py -p leo -i i-1234567890abcdef0
-
-- Find out how many instances per region you have
-  lister.py -p leo -l
-
-WARNING: if no region is defined, a random one will be used.
-
-""", formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('-r','--region', help='Region to be used for ec2 listing', required=False, default=None)
-parser.add_argument('-p','--profile', help='Profile to authenticate', required=True)
-parser.add_argument('-fk','--filter_key', help='Key used for filtering', required=False, default=None, nargs='*')
-parser.add_argument('-fv','--filter_value', help='Value used for filtering (one or more)', required=False, default=None, nargs='*')
-parser.add_argument('-i','--instance-id', help='Get instance details nicely formatted', required=False, default=None)
-parser.add_argument('-l','--list', help='Amount of instances per region (one or more)', required=False, default=None, action='store_true')
-parser.add_argument(
-    "--rich-traceback",
-    action="store_true",
-    help="Rich traceback. Default: regular traceback.",
-    default=False,
-)
-args = vars(parser.parse_args())
-
-if args.get("rich_traceback"):
-    from rich.traceback import install
-    install(show_locals=True)
-
 console = Console()
+
+
+def parse_args(args: Optional[list] = None):
+    if args is None:
+        import sys
+        args = sys.argv[1:]
+
+    parser = argparse.ArgumentParser(
+        description="""
+    This script will list your ec2 instance with a given profile.
+    You may also define a region (if not configured on the profile this is required), and you can filter. A few examples:
+    - Get all instances on the default profile region that has the tag "env" on value "beta"
+      lister.py -p leo -fk "tag:env" -fv beta
+
+    - Get all instances on the default profile region
+      lister.py -p leo
+
+    - Get all instances on region 'us-west-1' with profile leo and tag "env" on value "prod"
+      lister.py -p leo -r us-west-1 -fk "tag:env" -fv beta
+
+    - Get all instances on region us-west-1 with profile leo, with tag env set to prodp3, and role set to webserver
+      lister.py -p leo -r us-west-1 -fk tag:env tag:role -fv prodp3 webservers
+
+    - Complex filtering patterns!
+      lister.py -p leo -r us-west-2 -fk tag:env tag:role -fv staging,beta webservers
+
+    -  Get details from an instance
+      lister.py -p leo -i i-1234567890abcdef0
+
+    - Find out how many instances per region you have
+      lister.py -p leo -l
+
+    WARNING: if no region is defined, a random one will be used.
+    """,
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        '-r',
+        '--region',
+        help='Region to be used for ec2 listing. Default: choose a region at random.',
+        default=None,
+    )
+    parser.add_argument(
+        '-p',
+        '--profile',
+        help='Profile to authenticate',
+        required=True,
+    )
+    parser.add_argument(
+        '-fk',
+        '--filter_key',
+        help='Key used for filtering',
+        default=None,
+        nargs='*',
+    )
+    parser.add_argument(
+        '-fv',
+        '--filter_value',
+        help='Value used for filtering (one or more)',
+        default=None,
+        nargs='*',
+    )
+    parser.add_argument(
+        '-i',
+        '--instance-id',
+        help='Get instance details nicely formatted',
+        default=None,
+    )
+    parser.add_argument(
+        '-l',
+        '--list',
+        action='store_true',
+        help='Amount of instances per region (one or more)',
+        default=False,
+    )
+    parser.add_argument(
+        "--rich-traceback",
+        action="store_true",
+        help="Rich traceback. Default: regular traceback.",
+        default=False,
+    )
+
+    return vars(parser.parse_args(args))
 
 
 def handler(signum, frame):
     """
-    Handles ctrl-c on show_instances() for a clean exit.
-    
+    Handles Ctrl-C on show_instances() for a clean exit.
     """
-
-    console.log(":warning: Ctrl-C detected. Exiting lister..." , style="bold yellow")
+    console.log(":warning: Ctrl-C detected. Exiting lister...", style="bold yellow")
     exit(2)
-
-signal.signal(signal.SIGINT, handler)
 
 
 def region_lister(profile: str) -> list:
@@ -234,6 +266,14 @@ def main(ec2) -> None:
 
 
 if __name__ == "__main__":
+    args = parse_args()
+
+    signal.signal(signal.SIGINT, handler)
+
+    if args.get("rich_traceback"):
+        from rich.traceback import install
+        install(show_locals=True)
+
     profile_name = args.get("profile")
     region_name = args.get("region")
 
