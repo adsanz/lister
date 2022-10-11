@@ -100,13 +100,17 @@ def get_ec2(profile: str, regions: list, region: Optional[str] = None) -> object
         boto3 ec2 session object.
     """
     if region is None:
-        region = choice(regions)
-        console.log(
-            f":warning: No region defined. Using [bold underline white on black]{region}[/] as profile region.",
-            style=WARNING_STYLE,
-        )
+        try:
+            session = boto3.Session(profile_name=profile, region_name=region)
+            return session.resource("ec2")
+        except:
+            region = choice(regions)
+            console.log(
+                f":warning: No region defined. Using [bold underline white on black]{region}[/] as profile region.",
+                style=WARNING_STYLE,
+            )
 
-    if region not in regions:
+    elif region not in regions:
         console.log(f":warning: Region {region} is not valid. Exiting...", style=ERROR_STYLE)
         exit(1)
 
