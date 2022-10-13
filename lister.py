@@ -15,11 +15,6 @@ from rich.console import Console
 from rich.table import Table
 
 
-# Automatic rich traceback handler
-NICE_TRACEBACK = False
-if NICE_TRACEBACK:
-    from rich.traceback import install
-    install(show_locals=True)
 ERROR_STYLE = "bold red"
 WARNING_STYLE = "bold yellow"
 
@@ -57,7 +52,17 @@ parser.add_argument('-fk','--filter_key', help='Key used for filtering', require
 parser.add_argument('-fv','--filter_value', help='Value used for filtering (one or more)', required=False, default=None, nargs='*')
 parser.add_argument('-i','--instance-id', help='Get instance details nicely formatted', required=False, default=None)
 parser.add_argument('-l','--list', help='Amount of instances per region (one or more)', required=False, default=None, action='store_true')
+parser.add_argument(
+    "--rich-traceback",
+    action="store_true",
+    help="Rich traceback. Default: regular traceback.",
+    default=False,
+)
 args = vars(parser.parse_args())
+
+if args.get("rich_traceback"):
+    from rich.traceback import install
+    install(show_locals=True)
 
 console = Console()
 
