@@ -6,6 +6,7 @@ import datetime
 import argparse
 import signal  # trap Ctrl-c for show_instance cleaner exit
 from typing import Optional
+import threading
 
 import boto3
 from botocore.exceptions import ProfileNotFound
@@ -118,6 +119,37 @@ def get_ec2(profile: str, regions: list, region: Optional[str] = None) -> object
 
     return session.resource("ec2")
 
+class lister_threading(threading.Thread):
+    """
+    Get all instance on a given region.
+
+    Args:
+        region (str): AWS region to be used.
+
+    Return:
+        None (logs to console).
+    
+    """
+
+    def __init__(self, region: str):
+        super().__init__()
+        self.region = region
+
+    def run(self) -> None:
+        ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=self.region)
+        instances = list(ec2.instances.all())
+
+        color = "white"
+        style = "bold green"
+        if not instances:
+            color = "red"
+            style = ERROR_STYLE
+
+        msg = (
+            f"Found [bold underline {color} on black]{len(instances)}[/] instances on" 
+            f" region [bold underline white on black]{self.region}[/]"
+        )
+        console.log(msg, style=style)
 
 def lister(regions: list) -> None:
     """
@@ -128,23 +160,15 @@ def lister(regions: list) -> None:
     Return:
         Nothing.
     """
-    for region in regions:
-        with console.status(f"[bold green]Getting instances for[/] {region} ...", spinner="dots"):
-            ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=region)
-            instances = list(ec2.instances.all())
-
-            color = "white"
-            style = "bold green"
-            if not instances:
-                color = "red"
-                style = ERROR_STYLE
-
-            msg = (
-                f"Found [bold underline {color} on black]{len(instances)}[/] instances on" 
-                f" region [bold underline white on black]{region}[/]"
-            )
-            console.log(msg, style=style)
-
+    #regions_dup = regions.copy()
+    threads = []
+    with console.status(f"[bold green]Getting instances... [/]", spinner="dots"):
+        for region in regions:
+            thread = lister_threading.run_list(region)
+            thread.start()
+            threads.append(thread)
+        for thread in threads:
+            thread.join()
 
 def show_instance(ec2, instance_id) -> None:
     """
