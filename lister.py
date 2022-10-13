@@ -52,12 +52,7 @@ parser.add_argument('-fk','--filter_key', help='Key used for filtering', require
 parser.add_argument('-fv','--filter_value', help='Value used for filtering (one or more)', required=False, default=None, nargs='*')
 parser.add_argument('-i','--instance-id', help='Get instance details nicely formatted', required=False, default=None)
 parser.add_argument('-l','--list', help='Amount of instances per region (one or more)', required=False, default=None, action='store_true')
-parser.add_argument(
-    "--rich-traceback",
-    action="store_true",
-    help="Rich traceback. Default: regular traceback.",
-    default=False,
-)
+parser.add_argument("--rich-traceback", action="store_true", help="Rich traceback. Default: regular traceback.", default=False)
 args = vars(parser.parse_args())
 
 if args.get("rich_traceback"):
