@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+import _thread
 from secrets import choice
 import json
 import datetime
@@ -62,17 +62,13 @@ if args.get("rich_traceback"):
 console = Console()
 
 
-def handler(signum, frame):
+def handler(signum, frame) -> None:
     """
     Handles ctrl-c on show_instances() for a clean exit.
     
     """
-
     console.log(":warning: Ctrl-C detected. Exiting lister..." , style="bold yellow")
     exit(2)
-
-signal.signal(signal.SIGINT, handler)
-
 
 def region_lister(profile: str) -> list:
     """
@@ -130,26 +126,31 @@ class lister_threading(threading.Thread):
         None (logs to console).
     
     """
-
-    def __init__(self, region: str):
-        super().__init__()
+    def __init__(self, region: str, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.region = region
 
     def run(self) -> None:
-        ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=self.region)
-        instances = list(ec2.instances.all())
+        if args.get("list"):
+            ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=self.region)
+            instances = list(ec2.instances.all())
 
-        color = "white"
-        style = "bold green"
-        if not instances:
-            color = "red"
-            style = ERROR_STYLE
+            color = "white"
+            style = "bold green"
+            if not instances:
+                color = "red"
+                style = ERROR_STYLE
 
-        msg = (
-            f"Found [bold underline {color} on black]{len(instances)}[/] instances on" 
-            f" region [bold underline white on black]{self.region}[/]"
-        )
-        console.log(msg, style=style)
+            msg = (
+                f"Found [bold underline {color} on black]{len(instances)}[/] instances on" 
+                f" region [bold underline white on black]{self.region}[/]"
+            )
+            console.log(msg, style=style)
+        else:
+            """
+            Future reference might use threading anywhere else.
+            """
+            pass
 
 def lister(regions: list) -> None:
     """
@@ -164,11 +165,13 @@ def lister(regions: list) -> None:
     threads = []
     with console.status(f"[bold green]Getting instances... [/]", spinner="dots"):
         for region in regions:
-            thread = lister_threading.run_list(region)
+            thread = lister_threading(region=region)
             thread.start()
             threads.append(thread)
         for thread in threads:
-            thread.join()
+            if thread.is_alive():
+                thread.join(1)
+                
 
 def show_instance(ec2, instance_id) -> None:
     """
@@ -253,6 +256,7 @@ def main(ec2) -> None:
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, handler)
     profile_name = args.get("profile")
     region_name = args.get("region")
 
