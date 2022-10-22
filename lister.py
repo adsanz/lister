@@ -65,9 +65,8 @@ console = Console()
 def handler(signum, frame) -> None:
     """
     Handles ctrl-c on show_instances() for a clean exit.
-    
     """
-    console.log(":warning: Ctrl-C detected. Exiting lister..." , style="bold yellow")
+    console.log(":warning: Ctrl-C detected. Exiting lister...", style="bold yellow")
     exit(2)
 
 
@@ -126,7 +125,6 @@ class lister_threading(threading.Thread):
 
     Return:
         None (logs to console).
-
     """
     def __init__(self, region: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -153,6 +151,7 @@ class lister_threading(threading.Thread):
             Future reference might use threading anywhere else.
             """
             pass
+
 
 def lister(regions: list) -> None:
     """
