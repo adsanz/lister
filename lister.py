@@ -1,11 +1,12 @@
 #!/usr/bin/python3
-
+import _thread
 from secrets import choice
 import json
 import datetime
 import argparse
 import signal  # trap Ctrl-c for show_instance cleaner exit
 from typing import Optional
+import threading
 
 import boto3
 from botocore.exceptions import ProfileNotFound
@@ -51,12 +52,7 @@ parser.add_argument('-fk','--filter_key', help='Key used for filtering', require
 parser.add_argument('-fv','--filter_value', help='Value used for filtering (one or more)', required=False, default=None, nargs='*')
 parser.add_argument('-i','--instance-id', help='Get instance details nicely formatted', required=False, default=None)
 parser.add_argument('-l','--list', help='Amount of instances per region (one or more)', required=False, default=None, action='store_true')
-parser.add_argument(
-    "--rich-traceback",
-    action="store_true",
-    help="Rich traceback. Default: regular traceback.",
-    default=False,
-)
+parser.add_argument("--rich-traceback", action="store_true", help="Rich traceback. Default: regular traceback.", default=False)
 args = vars(parser.parse_args())
 
 if args.get("rich_traceback"):
@@ -66,16 +62,13 @@ if args.get("rich_traceback"):
 console = Console()
 
 
-def handler(signum, frame):
+def handler(signum, frame) -> None:
     """
     Handles ctrl-c on show_instances() for a clean exit.
     
     """
-
     console.log(":warning: Ctrl-C detected. Exiting lister..." , style="bold yellow")
     exit(2)
-
-signal.signal(signal.SIGINT, handler)
 
 
 def region_lister(profile: str) -> list:
@@ -124,18 +117,24 @@ def get_ec2(profile: str, regions: list, region: Optional[str] = None) -> object
     return session.resource("ec2")
 
 
-def lister(regions: list) -> None:
+class lister_threading(threading.Thread):
     """
-    List how many instances we have for each region.
+    Get all instance on a given region.
 
     Args:
-        regions: list of available regions.
+        region (str): AWS region to be used.
+
     Return:
-        Nothing.
+        None (logs to console).
+
     """
-    for region in regions:
-        with console.status(f"[bold green]Getting instances for[/] {region} ...", spinner="dots"):
-            ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=region)
+    def __init__(self, region: str, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.region = region
+
+    def run(self) -> None:
+        if args.get("list"):
+            ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=self.region)
             instances = list(ec2.instances.all())
 
             color = "white"
@@ -146,9 +145,34 @@ def lister(regions: list) -> None:
 
             msg = (
                 f"Found [bold underline {color} on black]{len(instances)}[/] instances on" 
-                f" region [bold underline white on black]{region}[/]"
+                f" region [bold underline white on black]{self.region}[/]"
             )
             console.log(msg, style=style)
+        else:
+            """
+            Future reference might use threading anywhere else.
+            """
+            pass
+
+def lister(regions: list) -> None:
+    """
+    List how many instances we have for each region.
+
+    Args:
+        regions: list of available regions.
+    Return:
+        Nothing.
+    """
+    #regions_dup = regions.copy()
+    threads = []
+    with console.status(f"[bold green]Getting instances... [/]", spinner="dots"):
+        for region in regions:
+            thread = lister_threading(region=region)
+            thread.start()
+            threads.append(thread)
+        for thread in threads:
+            if thread.is_alive():
+                thread.join(1)
 
 
 def show_instance(ec2, instance_id) -> None:
@@ -234,6 +258,7 @@ def main(ec2) -> None:
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, handler)
     profile_name = args.get("profile")
     region_name = args.get("region")
 
