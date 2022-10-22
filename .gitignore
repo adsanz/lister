@@ -1,2 +1,4 @@
 .vscode
 .idea
+.python-version
+poetry.lock
