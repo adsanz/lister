@@ -1,11 +1,12 @@
 #!/usr/bin/python3
-
+import _thread
 from secrets import choice
 import json
 import datetime
 import argparse
 import signal  # trap Ctrl-c for show_instance cleaner exit
 from typing import Optional
+import threading
 
 import boto3
 from botocore.exceptions import ProfileNotFound
@@ -102,7 +103,7 @@ def parse_args(args: Optional[list] = None):
     return vars(parser.parse_args(args))
 
 
-def handler(signum, frame):
+def handler(signum, frame) -> None:
     """
     Handles Ctrl-C on show_instances() for a clean exit.
     """
@@ -156,18 +157,23 @@ def get_ec2(profile: str, regions: list, region: Optional[str] = None) -> object
     return session.resource("ec2")
 
 
-def lister(regions: list) -> None:
+class lister_threading(threading.Thread):
     """
-    List how many instances we have for each region.
+    Get all instance on a given region.
 
     Args:
-        regions: list of available regions.
+        region (str): AWS region to be used.
+
     Return:
-        Nothing.
+        None (logs to console).
     """
-    for region in regions:
-        with console.status(f"[bold green]Getting instances for[/] {region} ...", spinner="dots"):
-            ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=region)
+    def __init__(self, region: str, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.region = region
+
+    def run(self) -> None:
+        if args.get("list"):
+            ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=self.region)
             instances = list(ec2.instances.all())
 
             color = "white"
@@ -178,9 +184,35 @@ def lister(regions: list) -> None:
 
             msg = (
                 f"Found [bold underline {color} on black]{len(instances)}[/] instances on" 
-                f" region [bold underline white on black]{region}[/]"
+                f" region [bold underline white on black]{self.region}[/]"
             )
             console.log(msg, style=style)
+        else:
+            """
+            Future reference might use threading anywhere else.
+            """
+            pass
+
+
+def lister(regions: list) -> None:
+    """
+    List how many instances we have for each region.
+
+    Args:
+        regions: list of available regions.
+    Return:
+        Nothing.
+    """
+    #regions_dup = regions.copy()
+    threads = []
+    with console.status(f"[bold green]Getting instances... [/]", spinner="dots"):
+        for region in regions:
+            thread = lister_threading(region=region)
+            thread.start()
+            threads.append(thread)
+        for thread in threads:
+            if thread.is_alive():
+                thread.join(1)
 
 
 def show_instance(ec2, instance_id) -> None:

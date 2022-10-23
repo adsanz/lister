@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "lister"
+version = "0.1.0"
+description = "Lister."
+authors = ["Adrián Sanz"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.10.7"
+boto3 = "1.14.63"
+rich = "12.6.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
