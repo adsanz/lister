@@ -3,3 +3,7 @@
 .python-version
 poetry.lock
 __pycache___/
+.nox
+.mypy_cache
+.coverage
+.pytest_cache

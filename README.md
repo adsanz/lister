@@ -26,3 +26,5 @@ Aditionally you can start [localstack](https://github.com/localstack/localstack)
 Use `lister -h` to see how it works
 
 By AdSanz
+
+ -- > https://medium.com/@cristobalcl/set-up-tests-linters-and-type-checking-in-python-projects-in-2020-9cc1b1e2750d
