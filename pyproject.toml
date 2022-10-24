@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "lister"
+version = "1.1.0"
+description = "Lister. A tool for EC2 listing, filtering & detail fetching."
+authors = ["Adrián Sanz"]
+readme = "README.md"
+homepage = "https://github.com/adsanz/lister"
+keywords = ["aws", "ec2", "list", "filter"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: WTFPL License",
+    "Operating System :: Unix",
+    "Operating System :: MacOS ",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Utilities"
+]
+
+[tool.poetry.scripts]
+lister = "lister:main"
+
+
+[tool.poetry.dependencies]
+python = "3.10.*"
+boto3 = "1.24.93"
+rich = "12.6.0"
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/adsanz/lister/issues"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
