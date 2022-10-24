@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import _thread
+# -*- coding: utf-8 -*-
 from secrets import choice
 import json
 import datetime
@@ -13,7 +13,6 @@ from botocore.exceptions import ProfileNotFound
 from rich.json import JSON
 from rich.console import Console
 from rich.table import Table
-
 
 ERROR_STYLE = "bold red"
 WARNING_STYLE = "bold yellow"
@@ -99,8 +98,16 @@ def parse_args(args: Optional[list] = None):
         help="Rich traceback. Default: regular traceback.",
         default=False,
     )
+    parser.add_argument(
+        "-ls",
+        "--localstack",
+        action="store_true",
+        help="Debug mode. Default: False.",
+        default=False,
+    )
 
     return vars(parser.parse_args(args))
+
 
 
 def handler(signum, frame) -> None:
@@ -111,7 +118,7 @@ def handler(signum, frame) -> None:
     exit(2)
 
 
-def region_lister(profile: str) -> list:
+def region_lister(profile: str, args: list) -> list:
     """
     List all regions from AWS instead of hardcoding them.
 
@@ -121,12 +128,15 @@ def region_lister(profile: str) -> list:
         List of regions.
     """
     session = boto3.Session(profile_name=profile, region_name="us-east-1")
-    client = session.client("ec2")
+    if args.get("localstack"):
+        client = session.client("ec2", endpoint_url='http://localhost:4566')
+    else:
+        client = session.client("ec2")
 
     return [region['RegionName'] for region in client.describe_regions()['Regions']]
 
 
-def get_ec2(profile: str, regions: list, region: Optional[str] = None) -> object:
+def get_ec2(profile: str, regions: list, args: list, region: Optional[str] = None) -> object:
     """
     Return a boto3 ec2 session object.
 
@@ -140,7 +150,10 @@ def get_ec2(profile: str, regions: list, region: Optional[str] = None) -> object
     if region is None:
         try:
             session = boto3.Session(profile_name=profile, region_name=region)
-            return session.resource("ec2")
+            if args.get("localstack"):
+                return session.resource("ec2", endpoint_url='http://localhost:4566')
+            else:
+                return session.resource("ec2")
         except:
             region = choice(regions)
             console.log(
@@ -153,8 +166,10 @@ def get_ec2(profile: str, regions: list, region: Optional[str] = None) -> object
         exit(1)
 
     session = boto3.Session(profile_name=profile, region_name=region)
-
-    return session.resource("ec2")
+    if args.get("localstack"):
+        return session.resource("ec2", endpoint_url='http://localhost:4566')
+    else:
+        return session.resource("ec2")
 
 
 class lister_threading(threading.Thread):
@@ -167,13 +182,15 @@ class lister_threading(threading.Thread):
     Return:
         None (logs to console).
     """
-    def __init__(self, region: str, *args, **kwargs) -> None:
+    def __init__(self, region: str, regions: list, arg_list: list, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.region = region
+        self.regions = regions
+        self.args = arg_list
 
     def run(self) -> None:
-        if args.get("list"):
-            ec2 = get_ec2(profile=args.get("profile"), regions=regions, region=self.region)
+        if self.args.get("list"):
+            ec2 = get_ec2(profile=self.args.get("profile"), regions=self.regions, region=self.region)
             instances = list(ec2.instances.all())
 
             color = "white"
@@ -194,7 +211,7 @@ class lister_threading(threading.Thread):
             pass
 
 
-def lister(regions: list) -> None:
+def lister(regions: list, args: list) -> None:
     """
     List how many instances we have for each region.
 
@@ -207,7 +224,7 @@ def lister(regions: list) -> None:
     threads = []
     with console.status(f"[bold green]Getting instances... [/]", spinner="dots"):
         for region in regions:
-            thread = lister_threading(region=region)
+            thread = lister_threading(region=region, regions=regions, arg_list=args)
             thread.start()
             threads.append(thread)
         for thread in threads:
@@ -215,7 +232,7 @@ def lister(regions: list) -> None:
                 thread.join(1)
 
 
-def show_instance(ec2, instance_id) -> None:
+def show_instance(ec2: object, instance_id: str) -> None:
     """
     Print in a table details of a specified instance
 
@@ -247,7 +264,7 @@ def show_instance(ec2, instance_id) -> None:
     console.print(table)
 
 
-def main(ec2) -> None:
+def main_list(ec2: object, args: list) -> None:
     if args['filter_key'] and args['filter_value'] != None:
         filter = [{'Name': 'instance-state-name', 'Values': ['running']}]
         # allow multiple sets of filter keys and values
@@ -296,8 +313,7 @@ def main(ec2) -> None:
 
     console.print(ec2_table)
 
-
-if __name__ == "__main__":
+def main(): 
     args = parse_args()
 
     signal.signal(signal.SIGINT, handler)
@@ -310,18 +326,22 @@ if __name__ == "__main__":
     region_name = args.get("region")
 
     try:
-        regions = region_lister(profile=profile_name)
+        regions = region_lister(profile=profile_name, args=args)
     except ProfileNotFound:
         console.log(f":warning: Profile '{profile_name}' is not valid. Exiting...", style=ERROR_STYLE)
         exit(1)
 
-    ec2 = get_ec2(profile=profile_name, regions=regions, region=region_name)
+    ec2 = get_ec2(profile=profile_name, regions=regions, region=region_name, args=args)
 
     if args.get("list"):
-        lister(regions=regions)
+        lister(regions=regions, args=args)
 
     elif args.get("instance_id"):
-        show_instance(ec2, args.get("instance_id"))
+        show_instance(ec2=ec2, instance_id=args.get("instance_id"))
 
     else:
-        main(ec2)
+        main_list(ec2=ec2, args=args)
+
+
+if __name__ == "__main__":
+    main()
