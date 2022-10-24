@@ -7,6 +7,7 @@ import argparse
 import signal  # trap Ctrl-c for show_instance cleaner exit
 from typing import Optional
 import threading
+from rich import box
 
 import boto3
 from botocore.exceptions import ProfileNotFound
@@ -92,6 +93,7 @@ def parse_args(args: Optional[list] = None):
         help='Amount of instances per region (one or more)',
         default=False,
     )
+
     parser.add_argument(
         "--rich-traceback",
         action="store_true",
@@ -103,6 +105,13 @@ def parse_args(args: Optional[list] = None):
         "--localstack",
         action="store_true",
         help="Debug mode. Default: False.",
+        default=False,
+    )
+    parser.add_argument(
+        "-st",
+        "--show-tags",
+        action="store_true",
+        help="Show tags. Default: False.",
         default=False,
     )
 
@@ -190,7 +199,7 @@ class lister_threading(threading.Thread):
 
     def run(self) -> None:
         if self.args.get("list"):
-            ec2 = get_ec2(profile=self.args.get("profile"), regions=self.regions, region=self.region)
+            ec2 = get_ec2(profile=self.args.get("profile"), regions=self.regions, region=self.region, args=self.args)
             instances = list(ec2.instances.all())
 
             color = "white"
@@ -244,7 +253,7 @@ def show_instance(ec2: object, instance_id: str) -> None:
     """
     with console.status("[bold green]Getting instances...", spinner="dots"):
         instance = ec2.Instance(instance_id)
-        table = Table(show_header=True, header_style="bold magenta", show_lines=True)
+        table = Table(show_header=True, header_style="bold magenta", show_lines=True, box=box.SQUARE_DOUBLE_HEAD)
         table.add_column("Attribute", style="white bold dim", width=30)
         table.add_column("Value", style="white dim")
         table.add_row("Instance ID", instance.id)
@@ -296,17 +305,19 @@ def main_list(ec2: object, args: list) -> None:
 
             if instance.tags is None:
                 tags = "None"
+                tag_key,tag_value = None,None
             else:
                 for tags in instance.tags:
                     if tags["Key"] == "Name":
                         name = tags["Value"]
+                    tag_key,tag_value = [tag["Key"] for tag in instance.tags],[tag["Value"] for tag in instance.tags]
 
-            ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list), str(uptime)+" Days"])
+            ec2_list.append([instance.instance_id,name, pub_ip, ", ".join(priv_ip_list), str(uptime)+" Days", f"[bold underline]Keys:[/] {tag_key}\n[bold underline]Values[/]: {tag_value}"])
 
-        ec2_table = Table(title="EC2 Instances")
+        ec2_table = Table(title="EC2 Instances", show_header=True, header_style="bold magenta", show_lines=True, box=box.SQUARE_DOUBLE_HEAD)
 
-        for header in ['Instance ID', 'Name', 'Public IP', 'Private IP', 'Uptime (days)']:
-            ec2_table.add_column(header, justify="center", style="cyan", no_wrap=True)
+        for header in ['Instance ID', 'Name', 'Public IP', 'Private IP', 'Uptime (days)', 'Tags']:
+            ec2_table.add_column(header, justify="left", style="cyan", no_wrap=True)
 
         for row in ec2_list:
             ec2_table.add_row(*row)
