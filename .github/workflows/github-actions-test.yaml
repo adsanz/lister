@@ -1,0 +1,28 @@
+name: Tests
+on:
+  pull_request:
+    types:
+      - "opened"
+      - "reopened"
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: pip3 install poetry
+      - run: poetry install
+      - run: poetry run nox -r
+
+# for later usage
+#on:
+#  pull_request:
+#    types:
+#      - closed
+#
+#jobs:
+#  if_merged:
+#    if: github.event.pull_request.merged == true
+#    runs-on: ubuntu-latest
+#    steps:
+#    - run: |
+#        echo The PR was merged
