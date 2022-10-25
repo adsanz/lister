@@ -1,4 +1,6 @@
 # Lister
+![Tests](https://github.com/adsanz/lister/actions/workflows/github-actions-test.yaml/badge.svg)
+
 
 A python utility to gather info from EC2 instances faster than from AWS web console.
 - List all instances on a region
