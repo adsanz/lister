@@ -4,12 +4,12 @@ import nox
 @nox.session(python=["3.10"])
 def tests(session):
     session.install("poetry")
-    session.run("poetry", "install")
+    session.run("poetry", "install", "--no-interaction")
     session.run("coverage", "run", "-m", "pytest")
     session.run("coverage", "report")
 
 
-@nox.session
+@nox.session(python=["3.10"])
 def lint(session):
     session.install("poetry")
     session.run("poetry", "install")
@@ -17,7 +17,7 @@ def lint(session):
     session.run("flake8", ".")
 
 
-@nox.session
+@nox.session(python=["3.10"])
 def typing(session):
     session.install("poetry")
     session.run("poetry", "install")
