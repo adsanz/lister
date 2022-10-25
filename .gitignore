@@ -2,4 +2,8 @@
 .idea
 .python-version
 poetry.lock
-__pycache___/
+__pycache__
+.nox
+.mypy_cache
+.coverage
+.pytest_cache
