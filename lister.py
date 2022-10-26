@@ -337,6 +337,7 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
         for instance in ec2.instances.filter(Filters=filter):
             uptime = (datetime.datetime.now().astimezone() - instance.launch_time).days
             pub_ip = instance.public_ip_address
+            name = ""
 
             # No need to check if private IPs are empty, since AWS will always assign a private IP to instances
             priv_ip_list = []
