@@ -114,10 +114,10 @@ def parse_args(args: Optional[list] = None):
         default=False,
     )
     parser.add_argument(
-        "-st",
-        "--show-tags",
+        "-nst",
+        "--not-show-tags",
         action="store_true",
-        help="Show tags. Default: False.",
+        help="Show tags. Default: False)",
         default=False,
     )
 
@@ -333,6 +333,8 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
 
     filter = build_filter(args)
     ec2_list = []
+    tag_key: list = []
+    tag_value: list = []
     with console.status("[bold green]Listing instances...", spinner="dots"):
         for instance in ec2.instances.filter(Filters=filter):
             uptime = (datetime.datetime.now().astimezone() - instance.launch_time).days
@@ -344,15 +346,24 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
             for priv_ip in instance.network_interfaces_attribute:
                 priv_ip_list.append(priv_ip["PrivateIpAddress"])
 
-            if instance.tags is None:
-                tag_key, tag_value = None, None
-            else:
+            if instance.tags:
                 for tags in instance.tags:
                     if tags["Key"] == "Name":
                         name = tags["Value"]
                     tag_key, tag_value = [tag["Key"] for tag in instance.tags], [
                         tag["Value"] for tag in instance.tags
                     ]
+
+                if args.get("not_show_tags"):
+                    tag_key = []
+                    tag_value = []
+
+                elif len(tag_key) > 3:
+                    console.print(
+                        f"[bold red]Instance {instance.id} has more than 3 tags, only the first 3 will be shown.[/]"
+                    )
+                    tag_key = tag_key[:3]
+                    tag_value = tag_value[:3]
 
             ec2_list.append(
                 [
