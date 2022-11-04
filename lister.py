@@ -333,6 +333,8 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
 
     filter = build_filter(args)
     ec2_list = []
+    tag_key: list = []
+    tag_value: list = []
     with console.status("[bold green]Listing instances...", spinner="dots"):
         for instance in ec2.instances.filter(Filters=filter):
             uptime = (datetime.datetime.now().astimezone() - instance.launch_time).days
@@ -344,15 +346,24 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
             for priv_ip in instance.network_interfaces_attribute:
                 priv_ip_list.append(priv_ip["PrivateIpAddress"])
 
-            if instance.tags is None:
-                tag_key, tag_value = None, None
-            else:
+            if instance.tags:
                 for tags in instance.tags:
                     if tags["Key"] == "Name":
                         name = tags["Value"]
                     tag_key, tag_value = [tag["Key"] for tag in instance.tags], [
                         tag["Value"] for tag in instance.tags
                     ]
+
+                if len(tag_key) > 3:
+                    console.print(
+                        f"""
+                        [bold yellow]
+                        :warning: Too many tags, only showing first 3[/] on instance [bold white on black]{instance.id}
+                        [/]""",
+                        style=WARNING_STYLE
+                    )
+                    tag_key = tag_key[:3]
+                    tag_value = tag_value[:3]
 
             ec2_list.append(
                 [
