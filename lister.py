@@ -114,11 +114,11 @@ def parse_args(args: Optional[list] = None):
         default=False,
     )
     parser.add_argument(
-        "-st",
-        "--show-tags",
+        "-nst",
+        "--not-show-tags",
         action="store_true",
-        help="Show tags. Default: True.",
-        default=True,
+        help="Show tags. Default: False)",
+        default=False,
     )
 
     return vars(parser.parse_args(args))
@@ -346,7 +346,7 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
             for priv_ip in instance.network_interfaces_attribute:
                 priv_ip_list.append(priv_ip["PrivateIpAddress"])
 
-            if instance.tags and args.get("show_tags"):
+            if instance.tags:
                 for tags in instance.tags:
                     if tags["Key"] == "Name":
                         name = tags["Value"]
@@ -354,7 +354,11 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
                         tag["Value"] for tag in instance.tags
                     ]
 
-                if len(tag_key) > 3:
+                if args.get("not_show_tags"):
+                    tag_key = []
+                    tag_value = []
+
+                elif len(tag_key) > 3:
                     console.print(
                         f"[bold red]Instance {instance.id} has more than 3 tags, only the first 3 will be shown.[/]"
                     )
