@@ -425,7 +425,9 @@ def main():
         )
         raise
 
-    ec2 = get_ec2(profile=profile_name, regions=regions, region=region_name, options=opts)
+    ec2 = get_ec2(
+        profile=profile_name, regions=regions, region=region_name, options=opts
+    )
 
     if opts.get("list"):
         lister(regions=regions, options=opts)
