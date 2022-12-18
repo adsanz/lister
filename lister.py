@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
 from secrets import choice
 import json
 import datetime
@@ -17,6 +15,7 @@ from rich.table import Table
 
 # stubs
 from mypy_boto3_ec2 import EC2ServiceResource
+
 
 ERROR_STYLE = "bold red"
 WARNING_STYLE = "bold yellow"
@@ -132,17 +131,19 @@ def handler(signum, frame) -> None:
     exit(2)
 
 
-def region_lister(profile: str, args: dict) -> list:
+def region_lister(profile: str, options: dict) -> list:
     """
     List all regions from AWS instead of hardcoding them.
 
     Args:
         profile: AWS profile to be used.
+        options: dictionary of options.
     Return:
         List of regions.
     """
     session = boto3.Session(profile_name=profile, region_name="us-east-1")
-    if args.get("localstack"):
+
+    if options.get("localstack"):
         client = session.client("ec2", endpoint_url="http://localhost:4566")
     else:
         client = session.client("ec2")
@@ -151,7 +152,7 @@ def region_lister(profile: str, args: dict) -> list:
 
 
 def get_ec2(
-    profile: str, regions: list, args: dict, region: Optional[str] = None
+    profile: str, regions: list, options: dict, region: Optional[str] = None
 ) -> EC2ServiceResource:
     """
     Return a boto3 ec2 session object.
@@ -160,13 +161,14 @@ def get_ec2(
         profile: AWS profile to be used.
         regions: list of available regions.
         region: AWS region to be used.
+        options: dictionary with options.
     Return:
         boto3 ec2 session object.
     """
     if region is None:
         try:
             session = boto3.Session(profile_name=profile, region_name=region)
-            if args.get("localstack"):
+            if options.get("localstack"):
                 return session.resource("ec2", endpoint_url="http://localhost:4566")
             else:
                 return session.resource("ec2")
@@ -185,7 +187,7 @@ def get_ec2(
         exit(1)
 
     session = boto3.Session(profile_name=profile, region_name=region)
-    if args.get("localstack"):
+    if options.get("localstack"):
         return session.resource("ec2", endpoint_url="http://localhost:4566")
     else:
         return session.resource("ec2")
@@ -206,6 +208,7 @@ class lister_threading(threading.Thread):
         self, profile: str, region: str, regions: list, arg_list: dict, *args, **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
+
         self.region = region
         self.regions = regions
         self.args = arg_list
@@ -217,7 +220,7 @@ class lister_threading(threading.Thread):
                 profile=self.profile,
                 regions=self.regions,
                 region=self.region,
-                args=self.args,
+                options=self.args,
             )
             instances = list(ec2.instances.all())
 
@@ -239,12 +242,13 @@ class lister_threading(threading.Thread):
             pass
 
 
-def lister(regions: list, args: dict) -> None:
+def lister(regions: list, options: dict) -> None:
     """
     List how many instances we have for each region.
 
     Args:
         regions: list of available regions.
+        options: dictionary with options.
     Return:
         Nothing.
     """
@@ -253,9 +257,9 @@ def lister(regions: list, args: dict) -> None:
         for region in regions:
             thread = lister_threading(
                 region=region,
-                profile=str(args.get("profile")),
+                profile=str(options.get("profile")),
                 regions=regions,
-                arg_list=args,
+                arg_list=options,
             )
             thread.start()
             threads.append(thread)
@@ -399,38 +403,39 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
 
     console.print(ec2_table)
 
+
 def main():
-    args = parse_args()
+    opts = parse_args()
 
     signal.signal(signal.SIGINT, handler)
 
-    if args.get("rich_traceback"):
+    if opts.get("rich_traceback"):
         from rich.traceback import install
 
         install(show_locals=True)
 
-    profile_name = args.get("profile")
-    region_name = args.get("region")
+    profile_name = opts.get("profile")
+    region_name = opts.get("region")
 
     try:
-        regions = region_lister(profile=profile_name, args=args)
+        regions = region_lister(profile=profile_name, options=opts)
     except ProfileNotFound:
         console.log(
             f":warning: Profile '{profile_name}' is not valid. Exiting...",
             style=ERROR_STYLE,
         )
-        exit(1)
+        raise
 
-    ec2 = get_ec2(profile=profile_name, regions=regions, region=region_name, args=args)
+    ec2 = get_ec2(profile=profile_name, regions=regions, region=region_name, options=opts)
 
-    if args.get("list"):
-        lister(regions=regions, args=args)
+    if opts.get("list"):
+        lister(regions=regions, options=opts)
 
-    elif args.get("instance_id"):
-        show_instance(ec2=ec2, instance_id=args.get("instance_id"))
+    elif opts.get("instance_id"):
+        show_instance(ec2=ec2, instance_id=opts.get("instance_id"))
 
     else:
-        main_list(ec2=ec2, args=args)
+        main_list(ec2=ec2, args=opts)
 
 
 if __name__ == "__main__":
