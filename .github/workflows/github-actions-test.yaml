@@ -1,0 +1,35 @@
+# https://jacobian.org/til/github-actions-poetry/
+
+name: Tests
+on:
+  pull_request:
+    types:
+      - "opened"
+      - "reopened"
+      - "synchronize"
+    branches:
+      - "master"
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10.8'
+      - uses: excitedleigh/setup-nox@v2.0.0
+      - run: nox -r
+
+# for later usage
+#on:
+#  pull_request:
+#    types:
+#      - closed
+#
+#jobs:
+#  if_merged:
+#    if: github.event.pull_request.merged == true
+#    runs-on: ubuntu-latest
+#    steps:
+#    - run: |
+#        echo The PR was merged
