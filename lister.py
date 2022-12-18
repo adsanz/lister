@@ -193,13 +193,12 @@ def get_ec2(
         return session.resource("ec2")
 
 
-class lister_threading(threading.Thread):
+class ListerThreading(threading.Thread):
     """
-    Get all instance on a given region.
+    Get all instances on a given region.
 
     Args:
         region (str): AWS region to be used.
-
     Return:
         None (logs to console).
     """
@@ -255,7 +254,7 @@ def lister(regions: list, options: dict) -> None:
     threads = []
     with console.status("[bold green]Getting instances... [/]", spinner="dots"):
         for region in regions:
-            thread = lister_threading(
+            thread = ListerThreading(
                 region=region,
                 profile=str(options.get("profile")),
                 regions=regions,
