@@ -4,7 +4,7 @@ import datetime
 import argparse
 import signal  # trap Ctrl-c for show_instance cleaner exit
 from typing import Optional
-import threading
+from threading import Thread
 from rich import box
 
 import boto3
@@ -15,7 +15,6 @@ from rich.table import Table
 
 # stubs
 from mypy_boto3_ec2 import EC2ServiceResource
-
 
 ERROR_STYLE = "bold red"
 WARNING_STYLE = "bold yellow"
@@ -152,7 +151,7 @@ def region_lister(profile: str, options: dict) -> list:
 
 
 def get_ec2(
-    profile: str, regions: list, options: dict, region: Optional[str] = None
+        profile: str, regions: list, options: dict, region: Optional[str] = None
 ) -> EC2ServiceResource:
     """
     Return a boto3 ec2 session object.
@@ -193,7 +192,7 @@ def get_ec2(
         return session.resource("ec2")
 
 
-class ListerThreading(threading.Thread):
+class ListerThreading(Thread):
     """
     Get all instances on a given region.
 
@@ -204,31 +203,23 @@ class ListerThreading(threading.Thread):
     """
 
     def __init__(
-        self, profile: str, region: str, regions: list, arg_list: dict, *args, **kwargs
+            self, profile: str, region: str, regions: list, arg_list: dict, *args, **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
-
-        self.region = region
-        self.regions = regions
-        self.args = arg_list
-        self.profile = profile
+        self.config = {
+            "profile": profile,
+            "region": region,
+            "regions": regions,
+            "args": arg_list,
+        }
+        for key, value in self.config.items():
+            setattr(self, key, value)
 
     def run(self) -> None:
         if self.args.get("list"):
-            ec2 = get_ec2(
-                profile=self.profile,
-                regions=self.regions,
-                region=self.region,
-                options=self.args,
-            )
+            ec2 = get_ec2(**self.config)
             instances = list(ec2.instances.all())
-
-            color = "white"
-            style = "bold green"
-            if not instances:
-                color = "red"
-                style = ERROR_STYLE
-
+            color, style = ("red", ERROR_STYLE) if not instances else ("white", "bold green")
             msg = (
                 f"Found [bold underline {color} on black]{len(instances)}[/] instances on"
                 f"region [bold underline white on black]{self.region}[/]"
@@ -239,6 +230,10 @@ class ListerThreading(threading.Thread):
             Future reference might use threading anywhere else.
             """
             pass
+
+    def start(self) -> 'ListerThreading':
+        super().start()
+        return self
 
 
 def lister(regions: list, options: dict) -> None:
@@ -253,18 +248,12 @@ def lister(regions: list, options: dict) -> None:
     """
     threads = []
     with console.status("[bold green]Getting instances... [/]", spinner="dots"):
-        for region in regions:
-            thread = ListerThreading(
-                region=region,
-                profile=str(options.get("profile")),
-                regions=regions,
-                arg_list=options,
-            )
-            thread.start()
-            threads.append(thread)
-        for thread in threads:
-            if thread.is_alive():
-                thread.join(1)
+        threads = [
+            ListerThreading(region=region, profile=str(options.get("profile")), regions=regions, arg_list=options)
+            .start() for region in regions
+        ]
+
+        [thread.join(1) for thread in threads if thread.is_alive()]
 
 
 def show_instance(ec2: EC2ServiceResource, instance_id: str) -> None:
@@ -287,24 +276,19 @@ def show_instance(ec2: EC2ServiceResource, instance_id: str) -> None:
         )
         table.add_column("Attribute", style="white bold dim", width=30)
         table.add_column("Value", style="white dim")
-        table.add_row("Instance ID", instance.id)
-        table.add_row("Instance Type", instance.instance_type)
-        table.add_row("Instance State", instance.state["Name"])
-        table.add_row("Instance Launch Time", str(instance.launch_time))
-        table.add_row("Instance Public IP", instance.public_ip_address)
-        table.add_row("Instance Private IP", instance.private_ip_address)
-        table.add_row("Instance Public DNS", instance.public_dns_name)
-        table.add_row("Instance Private DNS", instance.private_dns_name)
-        table.add_row("Instance Key Name", instance.key_name)
-        table.add_row(
-            "Instance IAM Role", JSON(json.dumps(instance.iam_instance_profile))
-        )
-        table.add_row("Instance VPC ID", instance.vpc_id)
-        table.add_row("Instance Subnet ID", instance.subnet_id)
-        table.add_row(
-            "Instance Security Groups", JSON(json.dumps(instance.security_groups))
-        )
-        table.add_row("Instance Tags", JSON(json.dumps(instance.tags)))
+        rows = {}
+        row_names = ("ID", "Type", "State", "Launch Time", "IPublic IP", "Private IP", "Public DNS", "Private DNS",
+                     "Key Name", "IAM Role", "VPC ID", "Subnet ID", "Security Groups", "Tags")
+
+        row_values = (instance.id, instance.instance_type, instance.state["Name"], str(instance.launch_time),
+                      instance.public_ip_address, instance.private_ip_address, instance.public_dns_name,
+                      instance.private_dns_name, instance.key_name, JSON(json.dumps(instance.iam_instance_profile)),
+                      instance.vpc_id, instance.subnet_id, JSON(json.dumps(instance.security_groups)),
+                      JSON(json.dumps(instance.tags)))
+
+        for name, value in zip(row_names, row_values):
+            table.add_row(f"Instance {name}", value)
+
     console.print(table)
 
 
@@ -318,26 +302,17 @@ def build_filter(args: dict) -> list:
         List of filters.
 
     """
-    if args["filter_key"] is not None and args["filter_value"] is not None:
-        filter = [{"Name": "instance-state-name", "Values": ["running"]}]
-        # allow multiple sets of filter keys and values
-        for fk, fv in zip(args["filter_key"], args["filter_value"]):
-            if "," in fv:
-                filter_list = [{"Name": fk, "Values": fv.split(",")}]
-            else:
-                filter_list = [{"Name": fk, "Values": [fv]}]
-            filter += filter_list
-    else:
-        filter = [{"Name": "instance-state-name", "Values": ["running"]}]
-    return filter
+    filter_list = [{"Name": "instance-state-name", "Values": ["running"]}]
+    filter_params = (args.get("filter_key", []), args.get("filter_value", []))
+    filter_list.extend([{"Name": fk, "Values": fv.split(",")} for fk, fv in zip(*filter_params) if all(filter_params)])
+
+    return filter_list
 
 
 def main_list(ec2: EC2ServiceResource, args: dict) -> None:
-
     filter = build_filter(args)
-    ec2_list = []
-    tag_key: list = []
-    tag_value: list = []
+    ec2_list, tag_key, tag_value = list(), list(), list()
+
     with console.status("[bold green]Listing instances...", spinner="dots"):
         for instance in ec2.instances.filter(Filters=filter):
             uptime = (datetime.datetime.now().astimezone() - instance.launch_time).days
@@ -345,28 +320,23 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
             name = ""
 
             # No need to check if private IPs are empty, since AWS will always assign a private IP to instances
-            priv_ip_list = []
-            for priv_ip in instance.network_interfaces_attribute:
-                priv_ip_list.append(priv_ip["PrivateIpAddress"])
+            priv_ip_list = [priv_ip["PrivateIpAddress"] for priv_ip in instance.network_interfaces_attribute]
 
-            if instance.tags:
-                for tags in instance.tags:
-                    if tags["Key"] == "Name":
-                        name = tags["Value"]
-                    tag_key, tag_value = [tag["Key"] for tag in instance.tags], [
-                        tag["Value"] for tag in instance.tags
-                    ]
+            instance_tags = instance.tags if instance.tags else list()
+            tag_key, tag_value = [tag["Key"] for tag in instance.tags], [
+                tag["Value"] for tag in instance.tags
+            ]
 
-                if args.get("not_show_tags"):
-                    tag_key = []
-                    tag_value = []
+            name = ([tags["Value"] for tags in instance_tags if tags["Key"] == "Name"] + [name])[0]
 
-                elif len(tag_key) > 3:
-                    console.print(
-                        f"[bold red]Instance {instance.id} has more than 3 tags, only the first 3 will be shown.[/]"
-                    )
-                    tag_key = tag_key[:3]
-                    tag_value = tag_value[:3]
+            tag_key, tag_value = args.get("not_show_tags", (tag_key, tag_key))
+
+            if len(tag_key) > 3:
+                console.print(
+                    f"[bold red]Instance {instance.id} has more than 3 tags, only the first 3 will be shown.[/]"
+                )
+                tag_key = tag_key[:3]
+                tag_value = tag_value[:3]
 
             ec2_list.append(
                 [
@@ -387,18 +357,11 @@ def main_list(ec2: EC2ServiceResource, args: dict) -> None:
             box=box.SQUARE_DOUBLE_HEAD,
         )
 
-        for header in [
-            "Instance ID",
-            "Name",
-            "Public IP",
-            "Private IP",
-            "Uptime (days)",
-            "Tags",
-        ]:
-            ec2_table.add_column(header, justify="left", style="cyan", no_wrap=True)
+        params = dict(justify="left", style="cyan", no_wrap=True)
+        headers = ["Instance ID", "Name", "Public IP", "Private IP", "Uptime (days)", "Tags", ]
 
-        for row in ec2_list:
-            ec2_table.add_row(*row)
+        [ec2_table.add_column(header, **params) for header in headers]
+        [ec2_table.add_row(*row) for row in ec2_list]
 
     console.print(ec2_table)
 
