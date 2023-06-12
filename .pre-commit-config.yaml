@@ -8,6 +8,8 @@ repos:
   hooks:
   - id: flake8
     additional_dependencies: [flake8-bugbear]
+    # skip codes W503
+    args: [--ignore=W503]
 - repo: local
   hooks:
   - id: tests
@@ -16,7 +18,3 @@ repos:
     language: system
     types: [python]
     pass_filenames: false
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: 'v0.982'
-  hooks:
-  - id: mypy

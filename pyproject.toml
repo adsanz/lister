@@ -32,6 +32,7 @@ black = "^22.10.0"
 botocore = "^1.29.32"
 mypy-boto3-ec2 = "^1.26.28"
 boto3 = "^1.26.32"
+faker = "18.10.1"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/adsanz/lister/issues"
