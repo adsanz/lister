@@ -8,6 +8,8 @@ repos:
   hooks:
   - id: flake8
     additional_dependencies: [flake8-bugbear]
+    # skip codes W503
+    args: [--ignore=W503]
 - repo: local
   hooks:
   - id: tests
