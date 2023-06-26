@@ -41,7 +41,7 @@ faker = "18.10.1"
 [tool.poetry.group.dev.dependencies]
 flake8 = "^5.0.4"
 flake8-bugbear = "^22.9.23"
-mypy = "^0.982"
+mypy = "^1.4"
 coverage = {extras = ["toml"], version = "^6.5.0"}
 nox = "^2022.8.7"
 
